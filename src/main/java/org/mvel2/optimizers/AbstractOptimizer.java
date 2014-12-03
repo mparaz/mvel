@@ -22,6 +22,8 @@ import org.mvel2.MVEL;
 import org.mvel2.compiler.AbstractParser;
 
 import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.lang.Thread.currentThread;
 import static org.mvel2.util.ParseTools.*;
@@ -41,6 +43,23 @@ public class AbstractOptimizer extends AbstractParser {
   protected boolean staticAccess = false;
 
   protected int tkStart;
+
+  private static final Map<String, Class<?>> classForNameMap = new ConcurrentHashMap<String, Class<?>>();
+
+  private static Class<?> classForName(String name, 
+      boolean initialize, ClassLoader loader)
+      throws ClassNotFoundException {
+      final String key = name + "@" + loader.toString();
+
+      if (classForNameMap.containsKey(key)) {
+          return classForNameMap.get(key);
+      } else {
+          // Class.forName may throw CNFE, just propagate
+          final Class<?> klass = Class.forName(name, initialize, loader);
+          classForNameMap.put(key, klass); 
+          return klass;
+      }
+  }
 
   /**
    * Try static access of the property, and return an instance of the Field, Method of Class if successful.
@@ -163,7 +182,7 @@ public class AbstractOptimizer extends AbstractParser {
   private Class forNameWithInner(String className, ClassLoader classLoader) throws ClassNotFoundException {
     ClassNotFoundException cnfe = null;
     try {
-      return Class.forName(className, true, classLoader);
+      return classForName(className, true, classLoader);
     } catch (ClassNotFoundException e) {
       cnfe = e;
     }
